@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カレンダー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&amp;family=Noto+Sans+JP:wght@400;500;700&amp;family=VT323&amp;display=swap">
+<style>
+:root{
+  --pink:#ff71ce; --cyan:#01cdfe; --green:#05ffa1; --purple:#b967ff; --yellow:#fffb96;
+  --ink:#2a1a5e; --magenta:#8a1f7a;
+  --face:#d4d0e8; --shadow:#6a5f94;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Noto Sans JP',system-ui,sans-serif;color:var(--ink);min-height:100vh;
+  background:#c9a4ff;background:linear-gradient(180deg,#ffa8e6 0%,#c9a4ff 55%,#8fe3ff 100%) fixed}
+button{font-family:inherit}
+a:focus-visible,button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+/* ---------- 背景：夕日とグリッドの床 ---------- */
+.bg-sun{position:fixed;z-index:0;top:-90px;right:-60px;width:clamp(200px,24vw,320px);height:clamp(200px,24vw,320px);border-radius:50%;background:linear-gradient(180deg,var(--yellow),var(--pink))}
+.bg-floor{position:fixed;z-index:0;left:0;right:0;bottom:0;height:clamp(110px,18vh,180px);
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.55) 0 2px,transparent 2px 48px),repeating-linear-gradient(0deg,rgba(255,255,255,.55) 0 2px,transparent 2px 26px),#7b4fd1}
+
+/* ---------- ウィンドウ ---------- */
+.page{position:relative;z-index:1;padding:clamp(16px,3vh,36px) 16px clamp(130px,22vh,210px)}
+.desk{--ox:26px;--oy:34px;--maxd:0;display:grid;width:min(100%,calc(940px + var(--maxd) * var(--ox)));margin:0 auto;
+  padding:0 calc(var(--maxd) * var(--ox)) calc(var(--maxd) * var(--oy)) 0}
+.window{--d:0;grid-area:1 / 1;align-self:start;min-width:0;background:var(--face);padding:4px;
+  transform:translate(calc(var(--d) * var(--ox)),calc(var(--d) * var(--oy)));
+  box-shadow:inset -2px -2px 0 var(--shadow),inset 2px 2px 0 #fff,6px 6px 0 rgba(42,26,94,.45)}
+.window:focus{outline:none}
+.window.is-opening{animation:win-open .34s cubic-bezier(.2,.9,.3,1.15) both}
+.window.is-closing{animation:win-close .22s ease-in both;pointer-events:none}
+.window.is-under .titlebar{background:linear-gradient(90deg,#7d74a8,#aaa3d2);color:#efeaff}
+@keyframes win-open{
+  from{opacity:0;transform:translate(calc(var(--d) * var(--ox)),calc(var(--d) * var(--oy) + 30px)) scale(.9)}
+  to{opacity:1;transform:translate(calc(var(--d) * var(--ox)),calc(var(--d) * var(--oy))) scale(1)}}
+@keyframes win-close{
+  from{opacity:1;transform:translate(calc(var(--d) * var(--ox)),calc(var(--d) * var(--oy))) scale(1)}
+  to{opacity:0;transform:translate(calc(var(--d) * var(--ox)),calc(var(--d) * var(--oy) + 22px)) scale(.92)}}
+@media (prefers-reduced-motion: reduce){.window.is-opening,.window.is-closing{animation:none}}
+.titlebar{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:36px;padding:3px 4px 3px 10px;color:#fff;
+  background:linear-gradient(90deg,var(--ink),var(--purple));font-family:'DotGothic16','VT323',monospace;font-size:18px;letter-spacing:.08em}
+.tb-btns{display:flex;align-items:center;gap:6px}
+.tb-x{width:36px;height:28px;padding:0;border:0;background:var(--face);color:var(--ink);font-size:18px;line-height:1;cursor:pointer;
+  box-shadow:inset -2px -2px 0 var(--shadow),inset 2px 2px 0 #fff}
+.tb-x:hover{color:var(--magenta)}
+.tb-x[disabled]{color:#9a91bd;cursor:not-allowed}
+.body{padding:clamp(12px,2.4vw,22px)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.ttl{margin:0;font-family:'DotGothic16','Noto Sans JP',sans-serif;font-size:clamp(34px,5.4vw,52px);font-weight:400;color:var(--ink);letter-spacing:.08em;line-height:1.1}
+.ttl small{display:block;font-size:.36em;letter-spacing:.12em;color:var(--magenta);margin-top:6px}
+.nav{display:flex;gap:8px;flex-wrap:wrap}
+.btn{min-height:48px;padding:4px 14px;background:var(--face);color:var(--ink);display:inline-flex;flex-direction:column;justify-content:center;align-items:flex-start;
+  font-size:14px;font-weight:500;text-decoration:none;line-height:1.25;
+  box-shadow:inset -2px -2px 0 var(--shadow),inset 2px 2px 0 #fff}
+.btn:hover{color:var(--magenta)}
+.btn:active{box-shadow:inset 2px 2px 0 var(--shadow),inset -2px -2px 0 #fff}
+.btn small{font-size:10px;font-weight:400;color:#5f5490}
+.btn.is-disabled{color:#8e85b4}
+.btn.is-disabled small{color:#8e85b4}
+
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:2px solid var(--purple);border-left:2px solid var(--purple)}
+.hd{font-size:15px;font-weight:700;color:var(--ink);background:var(--green);text-align:center;padding:8px 0;border-right:2px solid var(--purple);border-bottom:2px solid var(--purple)}
+.hd.hd-sun{background:var(--pink)}
+.hd.hd-sat{background:var(--cyan)}
+.cell{width:100%;min-height:clamp(66px,10vh,94px);padding:6px 8px;margin:0;border:0;border-right:2px solid var(--purple);border-bottom:2px solid var(--purple);
+  background:#fff6fd;font-family:'VT323','Noto Sans JP',monospace;font-size:clamp(22px,2.6vw,28px);line-height:1.1;color:var(--ink);
+  position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left}
+.cell.is-sat{background:#e4f9ff;color:#0a6fa8}
+.cell.is-sun{background:#ffeaf8;color:var(--magenta)}
+.cell.holiday{background:#ffd9f1;color:var(--magenta)}
+.cell.out{background:#d9c9f2}
+button.cell{cursor:pointer}
+button.cell:hover{background:#ffc4ea}
+.cell.today{background:var(--yellow);box-shadow:inset 0 0 0 3px var(--pink)}
+.cell.sel{box-shadow:inset 0 0 0 3px var(--ink)}
+.cell.has-memo::after{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 16px 16px 0;border-color:transparent var(--pink) transparent transparent}
+.memo-chip{display:block;max-width:100%;margin-top:auto;padding:1px 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  font-family:'Noto Sans JP',sans-serif;font-size:11px;line-height:1.4;font-weight:500;color:var(--ink);background:var(--yellow);box-shadow:inset 0 0 0 1px var(--purple)}
+.memo-chip[hidden]{display:none}
+.sp{font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:700;color:#fff;background:var(--magenta);padding:1px 6px;line-height:1.35}
+
+.statusbar{margin-top:16px;padding:8px 12px;font-size:12px;line-height:1.6;color:var(--ink);background:#fff6fd;
+  box-shadow:inset 2px 2px 0 var(--shadow),inset -2px -2px 0 #fff}
+
+/* ---------- ポップアップ（小さなウィンドウ） ---------- */
+dialog{width:min(500px,92vw);max-height:90vh;padding:0;border:0;background:transparent;color:var(--ink);overflow:visible}
+dialog::backdrop{background:rgba(42,26,94,.55)}
+.dlg-win{background:var(--face);padding:4px;box-shadow:inset -2px -2px 0 var(--shadow),inset 2px 2px 0 #fff,6px 6px 0 rgba(42,26,94,.45)}
+.dlg-title{display:flex;justify-content:space-between;align-items:center;padding:4px 6px 4px 10px;color:#fff;
+  background:linear-gradient(90deg,var(--ink),var(--purple));font-family:'DotGothic16','VT323',monospace;font-size:18px}
+.dlg-x{width:36px;height:30px;padding:0;border:0;background:var(--face);color:var(--ink);font-size:18px;line-height:1;cursor:pointer;
+  box-shadow:inset -2px -2px 0 var(--shadow),inset 2px 2px 0 #fff}
+.dlg-body{margin-top:4px;padding:16px 18px 18px;background:#fff6fd;max-height:70vh;overflow:auto;
+  box-shadow:inset 2px 2px 0 var(--shadow),inset -2px -2px 0 #fff}
+.dlg-kind{display:inline-block;font-size:12px;font-weight:700;color:#fff;background:var(--purple);padding:1px 8px}
+.dlg-kind[hidden]{display:none}
+.dlg-name{margin:8px 0 0;font-family:'DotGothic16','Noto Sans JP',sans-serif;font-size:28px;font-weight:400;color:var(--magenta)}
+.dlg-date{font-size:14px;margin-top:4px}
+.dlg-memo-label{display:block;margin:14px 0 6px;font-size:13px;font-weight:700;color:#fff;background:var(--ink);padding:2px 10px;width:max-content}
+.dlg-text{display:block;width:100%;min-height:150px;padding:10px 12px;resize:vertical;font-family:'Noto Sans JP',sans-serif;font-size:15px;line-height:1.7;color:var(--ink);background:#fff;
+  border:0;box-shadow:inset 2px 2px 0 var(--shadow),inset -2px -2px 0 #fff}
+.dlg-text:focus-visible{outline:2px solid var(--pink);outline-offset:1px}
+.dlg-count{margin:6px 0 0;font-size:12px;color:#5f5490;text-align:right}
+.dlg-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.dlg-btn{min-height:44px;padding:0 18px;border:0;background:var(--face);color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;
+  box-shadow:inset -2px -2px 0 var(--shadow),inset 2px 2px 0 #fff}
+.dlg-btn:hover{color:var(--magenta)}
+.dlg-btn:active{box-shadow:inset 2px 2px 0 var(--shadow),inset -2px -2px 0 #fff}
+.dlg-btn[disabled]{color:#9a91bd;cursor:not-allowed}
+.dlg-btn.primary{background:var(--green)}
+.dlg-err{margin:10px 0 0;font-size:12px;line-height:1.6;color:#b00055}
+.dlg-note{font-size:12px;color:#5f5490;line-height:1.7;margin:12px 0 0}
+
+@media (max-width:640px){
+  .desk{--ox:8px;--oy:32px}
+  .cell{padding:4px 5px}
+  .sp{font-size:10px}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-sun" aria-hidden="true"></div>
+<div class="bg-floor" aria-hidden="true"></div>
+
+<main class="page">
+  <div class="desk" id="desk"></div>
+</main>
+
+<dialog id="day-dialog" aria-labelledby="dlg-name">
+  <div class="dlg-win">
+    <div class="dlg-title">
+      <span>メモ.txt</span>
+      <form method="dialog"><button class="dlg-x" aria-label="閉じる">×</button></form>
+    </div>
+    <div class="dlg-body">
+      <span class="dlg-kind" data-f="kind" hidden></span>
+      <h2 class="dlg-name" id="dlg-name" data-f="date"></h2>
+      <label class="dlg-memo-label" for="dlg-text">メモ</label>
+      <textarea class="dlg-text" id="dlg-text" maxlength="500" placeholder="この日の予定やメモを書いてください"></textarea>
+      <p class="dlg-count"><span id="dlg-len">0</span> / 500</p>
+      <p class="dlg-err" id="dlg-err" hidden>保存できませんでした。ブラウザの設定でストレージ（localStorage）が無効になっている可能性があります。</p>
+      <div class="dlg-actions">
+        <button type="button" class="dlg-btn primary" id="dlg-save">保存</button>
+        <button type="button" class="dlg-btn" id="dlg-delete">削除</button>
+        <button type="button" class="dlg-btn" id="dlg-cancel">閉じる</button>
+      </div>
+      <p class="dlg-note">Ctrl + Enter でも保存できます。メモはこのブラウザの中だけに保存され、別のブラウザやパソコンには引き継がれません。</p>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= 設定 ================= */
+  var CAL_MIN_YEAR = 2007;   // 昭和の日・みどりの日の入れ替え以降
+  var CAL_MAX_YEAR = 2099;   // 春分・秋分の計算式が使える範囲
+  var WEEK = ['日', '月', '火', '水', '木', '金', '土'];
+  var STORE = 'cal-memos-v1';
+  var MAX_SHIFT = 7;
+
+  var desk = document.getElementById('desk');
+  var dlg = document.getElementById('day-dialog');
+  var busy = false;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var currentBtn = null;
+  var currentKey = null;
+
+  /* ================= 1. 日付の道具（UTC基準でズレ防止） ================= */
+  function pad(n, w) { n = String(n); while (n.length < (w || 2)) { n = '0' + n; } return n; }
+  function ymd(y, m, d) { return pad(y, 4) + '-' + pad(m) + '-' + pad(d); }
+  function parseYmd(s) { var p = s.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); }
+  function fmtUtc(dt) { return ymd(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate()); }
+  function addDays(s, n) { var d = parseYmd(s); d.setUTCDate(d.getUTCDate() + n); return fmtUtc(d); }
+  function dow(s) { return parseYmd(s).getUTCDay(); }
+  function daysInMonth(y, m) { return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /** 日本時間の「今日」 */
+  function todayJst() {
+    try {
+      var parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      if (/^\d{4}-\d{2}-\d{2}$/.test(parts)) { return parts; }
+    } catch (err) {}
+    var n = new Date();
+    return ymd(n.getFullYear(), n.getMonth() + 1, n.getDate());
+  }
+
+  /** 令和・平成の表記（2019年5月1日が改元） */
+  function jpEra(year, month) {
+    var n;
+    if (year > 2019 || (year === 2019 && month >= 5)) {
+      n = year - 2018;
+      return '令和' + (n === 1 ? '元' : n) + '年';
+    }
+    n = year - 1988;
+    return '平成' + (n === 1 ? '元' : n) + '年';
+  }
+
+  /* ================= 2. 日本の祝日 =================
+   * 種類  H 国民の祝日　K 国民の休日　S 振替休日 */
+  function nthMonday(year, month, n) {
+    var w = dow(ymd(year, month, 1));
+    return 1 + ((1 - w + 7) % 7) + 7 * (n - 1);
+  }
+  function vernal(y) { return Math.floor(20.8431 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4)); }
+  function autumnal(y) { return Math.floor(23.2488 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4)); }
+
+  function baseHolidays(y) {
+    var m = {};
+    function put(mo, d, name) { m[ymd(y, mo, d)] = [name, 'H']; }
+
+    put(1, 1, '元日');
+    put(1, nthMonday(y, 1, 2), '成人の日');
+    put(2, 11, '建国記念の日');
+    if (y >= 2020) { put(2, 23, '天皇誕生日'); }
+    else if (y <= 2018) { put(12, 23, '天皇誕生日'); }   // 2019年は天皇誕生日なし
+    put(3, vernal(y), '春分の日');
+    put(4, 29, '昭和の日');
+    put(5, 3, '憲法記念日');
+    put(5, 4, 'みどりの日');
+    put(5, 5, 'こどもの日');
+
+    // 海の日・スポーツの日・山の日は2020・2021年だけオリンピックのため移動
+    if (y === 2020) { put(7, 23, '海の日'); }
+    else if (y === 2021) { put(7, 22, '海の日'); }
+    else { put(7, nthMonday(y, 7, 3), '海の日'); }
+
+    if (y >= 2016) {
+      if (y === 2020) { put(8, 10, '山の日'); }
+      else if (y === 2021) { put(8, 8, '山の日'); }
+      else { put(8, 11, '山の日'); }
+    }
+    put(9, nthMonday(y, 9, 3), '敬老の日');
+    put(9, autumnal(y), '秋分の日');
+
+    var sport = y >= 2020 ? 'スポーツの日' : '体育の日';
+    if (y === 2020) { put(7, 24, sport); }
+    else if (y === 2021) { put(7, 23, sport); }
+    else { put(10, nthMonday(y, 10, 2), sport); }
+    put(11, 3, '文化の日');
+    put(11, 23, '勤労感謝の日');
+
+    if (y === 2019) {                                   // 改元に伴う一度きりの休日
+      put(5, 1, '天皇の即位の日');
+      put(10, 22, '即位礼正殿の儀の行われる日');
+    }
+    return m;
+  }
+
+  var yearCache = {};
+  function yearHolidays(year) {
+    if (yearCache[year]) { return yearCache[year]; }
+    var map = baseHolidays(year);
+    var keys = Object.keys(map).sort();
+
+    // 国民の休日：前日と翌日がどちらも祝日の平日（日曜は対象外）
+    keys.forEach(function (k) {
+      var mid = addDays(k, 1);
+      if (map[addDays(k, 2)] && !map[mid] && dow(mid) !== 0) { map[mid] = ['国民の休日', 'K']; }
+    });
+
+    // 振替休日：祝日が日曜なら、その後で最初の「祝日でない日」
+    keys.forEach(function (k) {
+      if (dow(k) === 0) {
+        var t = addDays(k, 1);
+        while (map[t]) { t = addDays(t, 1); }
+        map[t] = ['振替休日', 'S'];
+      }
+    });
+    yearCache[year] = map;
+    return map;
+  }
+
+  /** 前の年・その年・次の年をまとめる（振替休日が年をまたぐことがあるため） */
+  function holidaysAround(year) {
+    var out = {}, src = [yearHolidays(year - 1), yearHolidays(year + 1), yearHolidays(year)];
+    src.forEach(function (o) { for (var k in o) { if (Object.prototype.hasOwnProperty.call(o, k)) { out[k] = o[k]; } } });
+    return out;
+  }
+
+  /* ================= 3. 1か月ぶんのウィンドウを作る ================= */
+  function monthUrl(y, m) { return '?month=' + m + '&year=' + y; }
+
+  function shiftMonth(year, month, delta) {
+    var t = year * 12 + (month - 1) + delta;
+    return { y: Math.floor(t / 12), m: (t % 12) + 1 };
+  }
+
+  function buildWindow(year, month) {
+    var H = holidaysAround(year);
+    var lead = dow(ymd(year, month, 1));
+    var monthDays = daysInMonth(year, month);
+    var totalCells = Math.ceil((lead + monthDays) / 7) * 7;
+    var today = todayJst();
+
+    var prev = shiftMonth(year, month, -1);
+    var next = shiftMonth(year, month, 1);
+    var hasPrev = prev.y >= CAL_MIN_YEAR;
+    var hasNext = next.y <= CAL_MAX_YEAR;
+
+    var cells = '';
+    for (var i = 0; i < totalCells; i++) {
+      var d = i - lead + 1;
+      var inMonth = d >= 1 && d <= monthDays;
+      var w = i % 7;
+      var cls = 'cell';
+      if (w === 0) { cls += ' is-sun'; }
+      if (w === 6) { cls += ' is-sat'; }
+      if (!inMonth) { cls += ' out'; }
+
+      if (!inMonth) {
+        cells += '<div class="' + cls + '"><span></span></div>\n';
+        continue;
+      }
+      var key = ymd(year, month, d);
+      var ev = H[key] || null;
+      if (key === today) { cls += ' today'; }
+      if (ev) { cls += ' holiday'; }
+      cells += '<button type="button" class="' + cls + '" data-date="' + key + '" data-holiday="' + esc(ev ? ev[0] : '') +
+        '" aria-label="' + esc(month + '月' + d + '日' + (ev ? ' ' + ev[0] : '')) + '"><span>' + d + '</span>' +
+        (ev ? '<span class="sp">' + esc(ev[0]) + '</span>' : '') +
+        '<span class="memo-chip" hidden></span></button>\n';
+    }
+
+    var prevBtn = hasPrev
+      ? '<a class="btn" data-nav="prev" href="' + esc(monthUrl(prev.y, prev.m)) + '">◀ 前の月<small data-prev-sub>前の月に切り替える</small></a>'
+      : '<span class="btn is-disabled" aria-disabled="true">◀ 前の月<small>&nbsp;</small></span>';
+    var nextBtn = hasNext
+      ? '<a class="btn" data-nav="next" href="' + esc(monthUrl(next.y, next.m)) + '">次の月 ▶<small>新しいウィンドウで開く</small></a>'
+      : '<span class="btn is-disabled" aria-disabled="true">次の月 ▶<small>&nbsp;</small></span>';
+
+    var html =
+      '<section class="window" tabindex="-1" aria-label="' + esc(year + '年' + month + '月') + '"' +
+      ' data-url="' + esc(monthUrl(year, month)) + '" data-title="' + esc(year + '年' + month + '月 カレンダー') + '">' +
+      '<div class="titlebar"><span>カレンダー.exe — ' + year + '年' + month + '月</span>' +
+      '<span class="tb-btns"><span aria-hidden="true">_ □</span><button type="button" class="tb-x" data-close aria-label="このウィンドウを閉じる">×</button></span></div>' +
+      '<div class="body"><div class="top">' +
+      '<h1 class="ttl">' + month + '月<small>' + year + '年　' + esc(jpEra(year, month)) + '</small></h1>' +
+      '<nav class="nav" aria-label="月の切り替え">' + prevBtn +
+      '<a class="btn" data-nav="today" href="./">今日<small>今月に戻る</small></a>' + nextBtn + '</nav></div>' +
+      '<div class="grid">' +
+      '<div class="hd hd-sun">日</div><div class="hd">月</div><div class="hd">火</div><div class="hd">水</div>' +
+      '<div class="hd">木</div><div class="hd">金</div><div class="hd hd-sat">土</div>\n' + cells + '</div>' +
+      '<p class="statusbar">「次の月」を押すと新しいウィンドウが重なって開き、「前の月」（または右上の ×）でいちばん上のウィンドウが閉じます。' +
+      'いちばん下のウィンドウでは、閉じる代わりに前の月へ切り替わります。' +
+      '日付をクリックするとメモを書けます（このブラウザに保存されます）。</p>' +
+      '</div></section>';
+
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.firstChild;
+  }
+
+  /* ================= 4. ウィンドウの重なり ================= */
+  function liveWindows() { return Array.prototype.slice.call(desk.querySelectorAll('.window:not(.is-closing)')); }
+  function topWindow() { var w = liveWindows(); return w[w.length - 1]; }
+
+  function relayout() {
+    var w = liveWindows();
+    var n = w.length;
+    if (!n) { return; }
+    w.forEach(function (el, i) {
+      el.style.setProperty('--d', Math.min(i, MAX_SHIFT));
+      var under = i < n - 1;
+      el.classList.toggle('is-under', under);
+      if (under) { el.setAttribute('inert', ''); } else { el.removeAttribute('inert'); }
+    });
+    desk.style.setProperty('--maxd', Math.min(n - 1, MAX_SHIFT));
+    var t = w[n - 1];
+    var sub = t.querySelector('[data-prev-sub]');
+    if (sub) { sub.textContent = n > 1 ? 'このウィンドウを閉じる' : '前の月に切り替える'; }
+    var x = t.querySelector('[data-close]');
+    if (x) { x.disabled = n < 2; }
+    document.title = t.getAttribute('data-title');
+    try { history.replaceState(null, '', t.getAttribute('data-url')); } catch (err) {}
+  }
+
+  function afterAnim(el, ms, cb) {
+    var done = false;
+    function fin() { if (done) { return; } done = true; cb(); }
+    if (reduce) { fin(); return; }
+    el.addEventListener('animationend', fin, { once: true });
+    setTimeout(fin, ms + 120);
+  }
+
+  function showWindow(el) {
+    el.classList.add('is-opening');
+    desk.appendChild(el);
+    relayout();
+    renderChips();
+    afterAnim(el, 340, function () { el.classList.remove('is-opening'); });
+    try { el.focus({ preventScroll: true }); } catch (err) { el.focus(); }
+  }
+
+  function winYM(el) {
+    var m = /month=(\d+)&year=(\d+)/.exec(el.getAttribute('data-url'));
+    return { y: +m[2], m: +m[1] };
+  }
+
+  // 次の月：新しいウィンドウを重ねて開く
+  function openNext(y, m) {
+    if (busy) { return; }
+    busy = true;
+    var el = buildWindow(y, m);
+    showWindow(el);
+    afterAnim(el, 340, function () { busy = false; });
+  }
+
+  // 前の月：重なっていれば最上段を閉じ、いちばん下なら前の月に切り替える
+  function goPrev(y, m) {
+    if (busy) { return; }
+    var w = liveWindows();
+    if (w.length > 1) { closeTop(); return; }
+    busy = true;
+    var base = w[0];
+    var el = buildWindow(y, m);
+    base.classList.add('is-closing');
+    base.setAttribute('inert', '');
+    afterAnim(base, 220, function () {
+      base.remove();
+      showWindow(el);
+      afterAnim(el, 340, function () { busy = false; });
+    });
+  }
+
+  // 今日：全部のウィンドウを片づけて今月を表示
+  function goToday() {
+    if (busy) { return; }
+    var t = todayJst().split('-');
+    var y = Math.min(Math.max(+t[0], CAL_MIN_YEAR), CAL_MAX_YEAR);
+    var m = +t[1];
+    var w = liveWindows();
+    if (w.length === 1) {
+      var c = winYM(w[0]);
+      if (c.y === y && c.m === m) { return; }
+    }
+    w.forEach(function (el) { el.remove(); });
+    showWindow(buildWindow(y, m));
+  }
+
+  function closeTop() {
+    var w = liveWindows();
+    if (w.length < 2 || busy) { return; }
+    busy = true;
+    var t = w[w.length - 1];
+    t.classList.add('is-closing');
+    t.setAttribute('inert', '');
+    relayout();
+    afterAnim(t, 220, function () {
+      t.remove();
+      busy = false;
+      var nl = topWindow().querySelector('[data-nav="next"]');
+      if (nl) { nl.focus({ preventScroll: true }); }
+    });
+  }
+
+  desk.addEventListener('click', function (e) {
+    var link = e.target.closest('a[data-nav]');
+    if (link && desk.contains(link)) {
+      e.preventDefault();
+      var kind = link.getAttribute('data-nav');
+      var cur = winYM(link.closest('.window'));
+      if (kind === 'today') { goToday(); }
+      if (kind === 'next') { var n = shiftMonth(cur.y, cur.m, 1); openNext(n.y, n.m); }
+      if (kind === 'prev') { var p = shiftMonth(cur.y, cur.m, -1); goPrev(p.y, p.m); }
+      return;
+    }
+    if (e.target.closest('[data-close]')) { closeTop(); return; }
+    var btn = e.target.closest('button.cell[data-date]');
+    if (btn) { openFor(btn); }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || dlg.open) { return; }
+    var t = topWindow();
+    if (!t) { return; }
+    var l = null;
+    if (e.key === 'ArrowLeft') { l = t.querySelector('[data-nav="prev"]'); }
+    if (e.key === 'ArrowRight') { l = t.querySelector('[data-nav="next"]'); }
+    if (l) { l.click(); }
+  });
+
+  /* ================= 5. メモ（localStorage） ================= */
+  function loadMemos() {
+    try { return JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (err) { return {}; }
+  }
+  function saveMemos(obj) {
+    try { localStorage.setItem(STORE, JSON.stringify(obj)); return true; } catch (err) { return false; }
+  }
+
+  function renderChips() {
+    var memos = loadMemos();
+    desk.querySelectorAll('button.cell[data-date]').forEach(function (btn) {
+      var text = memos[btn.getAttribute('data-date')];
+      var chip = btn.querySelector('.memo-chip');
+      var base = btn.getAttribute('data-label') || btn.getAttribute('aria-label');
+      btn.setAttribute('data-label', base);
+      if (text) {
+        chip.textContent = text.split('\n')[0];
+        chip.hidden = false;
+        btn.classList.add('has-memo');
+        btn.setAttribute('aria-label', base + '　メモあり');
+      } else {
+        chip.textContent = '';
+        chip.hidden = true;
+        btn.classList.remove('has-memo');
+        btn.setAttribute('aria-label', base);
+      }
+    });
+  }
+
+  var textEl = document.getElementById('dlg-text');
+  var lenEl = document.getElementById('dlg-len');
+  var errEl = document.getElementById('dlg-err');
+  var delBtn = document.getElementById('dlg-delete');
+  var kindEl = dlg.querySelector('[data-f="kind"]');
+
+  function updateCount() { lenEl.textContent = textEl.value.length; }
+  textEl.addEventListener('input', updateCount);
+
+  function openFor(btn) {
+    var key = btn.getAttribute('data-date');
+    var p = key.split('-');
+    var dt = new Date(+p[0], +p[1] - 1, +p[2]);
+    var holiday = btn.getAttribute('data-holiday');
+    currentKey = key;
+    currentBtn = btn;
+    btn.classList.add('sel');
+
+    dlg.querySelector('[data-f="date"]').textContent = +p[0] + '年' + (+p[1]) + '月' + (+p[2]) + '日（' + WEEK[dt.getDay()] + '）';
+    kindEl.hidden = !holiday;
+    kindEl.textContent = holiday;
+    textEl.value = loadMemos()[key] || '';
+    delBtn.disabled = !textEl.value;
+    errEl.hidden = true;
+    updateCount();
+
+    if (typeof dlg.showModal === 'function') { dlg.showModal(); } else { dlg.setAttribute('open', ''); }
+    textEl.focus();
+  }
+
+  function saveCurrent() {
+    var memos = loadMemos();
+    var text = textEl.value.replace(/\s+$/, '');
+    if (text) { memos[currentKey] = text; } else { delete memos[currentKey]; }
+    if (!saveMemos(memos)) { errEl.hidden = false; return; }
+    renderChips();
+    dlg.close();
+  }
+
+  document.getElementById('dlg-save').addEventListener('click', saveCurrent);
+  document.getElementById('dlg-cancel').addEventListener('click', function () { dlg.close(); });
+  delBtn.addEventListener('click', function () {
+    var memos = loadMemos();
+    delete memos[currentKey];
+    if (!saveMemos(memos)) { errEl.hidden = false; return; }
+    renderChips();
+    dlg.close();
+  });
+  textEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveCurrent(); }
+  });
+  dlg.addEventListener('close', function () {
+    if (currentBtn) { currentBtn.classList.remove('sel'); currentBtn.focus(); }
+  });
+  window.addEventListener('storage', function (e) { if (e.key === STORE) { renderChips(); } });
+
+  /* ================= 6. 起動：?year=&month= を読む ================= */
+  var t0 = todayJst().split('-');
+  var qs = new URLSearchParams(location.search);
+  var y = parseInt(qs.get('year'), 10);
+  var m = parseInt(qs.get('month'), 10);
+  if (isNaN(y) || y < CAL_MIN_YEAR || y > CAL_MAX_YEAR) {
+    y = Math.min(Math.max(+t0[0], CAL_MIN_YEAR), CAL_MAX_YEAR);
+  }
+  if (isNaN(m) || m < 1 || m > 12) { m = +t0[1]; }
+
+  var first = buildWindow(y, m);
+  desk.appendChild(first);
+  relayout();
+  renderChips();
+})();
+</script>
+</body>
+</html>
